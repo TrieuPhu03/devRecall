@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Qdrant REST API</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 24px;
+        max-width: 800px;
+        background: #f7f9fc;
+        color: #333;
+      }
+      .card {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        margin-bottom: 20px;
+      }
+      label {
+        font-weight: 600;
+        display: block;
+        margin-top: 10px;
+        margin-bottom: 4px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .btn-group {
+        margin-top: 16px;
+        display: flex;
+        gap: 10px;
+      }
+      button {
+        padding: 8px 16px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      button:hover {
+        background: #1d4ed8;
+      }
+      pre {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 14px;
+        border-radius: 6px;
+        overflow-x: auto;
+        max-height: 400px;
+        font-size: 13px;
+      }
+      .status {
+        font-weight: bold;
+        margin-top: 8px;
+      }
+      .ok {
+        color: #16a34a;
+      }
+      .err {
+        color: #dc2626;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Qdrant Connection Tester</h2>
+
+    <div class="card">
+      <label for="url">Qdrant URL / Endpoint:</label>
+      <input
+        id="url"
+        type="text"
+        value="http://localhost:6333"
+        placeholder="http://localhost:6333 hoặc https://xxx.cloud.qdrant.io:6333"
+      />
+
+      <label for="apiKey">API Key (bắt buộc nếu dùng Qdrant Cloud):</label>
+      <input
+        id="apiKey"
+        type="password"
+        placeholder="Bỏ trống nếu chạy Docker local"
+      />
+
+      <label for="collection"
+        >Collection Name (dùng cho nút kiểm tra chi tiết):</label
+      >
+      <input
+        id="collection"
+        type="text"
+        placeholder="Tên collection cần kiểm tra"
+      />
+
+      <div class="btn-group">
+        <button onclick="checkHealth()">1. Test Health / Ready</button>
+        <button onclick="getCollections()">2. Danh sách Collections</button>
+        <button onclick="getCollectionDetail()">3. Chi tiết Collection</button>
+      </div>
+      <div id="statusText" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h3>Kết quả phản hồi (Response):</h3>
+      <pre id="output">// Nhấn một trong các nút ở trên để xem phản hồi...</pre>
+    </div>
+
+    <script>
+      function getHeaders() {
+        const apiKey = document.getElementById("apiKey").value.trim();
+        const headers = { "Content-Type": "application/json" };
+        if (apiKey) {
+          headers["api-key"] = apiKey;
+        }
+        return headers;
+      }
+
+      function getBaseUrl() {
+        return document.getElementById("url").value.trim().replace(/\/+$/, "");
+      }
+
+      function setStatus(msg, isError = false) {
+        const statusElem = document.getElementById("statusText");
+        statusElem.textContent = msg;
+        statusElem.className = "status " + (isError ? "err" : "ok");
+      }
+
+      async function sendRequest(path) {
+        const url = `${getBaseUrl()}${path}`;
+        const output = document.getElementById("output");
+        setStatus("Đang gửi yêu cầu...");
+        output.textContent = "Loading...";
+
+        try {
+          const response = await fetch(url, {
+            method: "GET",
+            headers: getHeaders(),
+          });
+
+          const data = await response.json();
+          output.textContent = JSON.stringify(data, null, 2);
+
+          if (response.ok) {
+            setStatus(`Thành công (HTTP ${response.status})`, false);
+          } else {
+            setStatus(`Lỗi (HTTP ${response.status})`, true);
+          }
+        } catch (err) {
+          output.textContent = `Lỗi mạng / CORS:\n${err.message}`;
+          setStatus("Kết nối thất bại (Kiểm tra lại URL hoặc CORS/Mạng)", true);
+        }
+      }
+
+      // 1. Kiểm tra trạng thái server
+      function checkHealth() {
+        sendRequest("/readyz");
+      }
+
+      // 2. Lấy danh sách tất cả các collections
+      function getCollections() {
+        sendRequest("/collections");
+      }
+
+      // 3. Xem thông tin chi tiết của collection đã nhập
+      function getCollectionDetail() {
+        const collName = document.getElementById("collection").value.trim();
+        if (!collName) {
+          alert("Vui lòng nhập tên Collection trước khi bấm xem chi tiết!");
+          return;
+        }
+        sendRequest(`/collections/${collName}`);
+      }
+    </script>
+  </body>
+</html>
